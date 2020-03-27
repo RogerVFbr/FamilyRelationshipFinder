@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from models.subject import Subject
+
 
 class FamilyFinder:
 
@@ -20,6 +22,9 @@ class FamilyFinder:
         self.df.replace('filho de', 'filho(a)', inplace=True)
 
     def get_relationship(self, subject_a, subject_b):
+
+        subj = Subject(subject_a, self.df)
+        print(subj)
 
         # Initialize procedure.
         self.checked_names = []
@@ -44,6 +49,25 @@ class FamilyFinder:
         # Acquire direct relatives.
         direct_relatives = self.__get_direct_relatives(subject_a, depth)
         return self.__decode_relationship(subject_b, list(direct_relatives), depth), relationship_line
+
+    # def __infer_missing_relationships(self):
+    #
+    #     everybody = pd.unique(self.df[['subject_a', 'subject_b']].values.ravel('K'))
+    #
+    #     for person in everybody:
+    #
+    #         # Infer parents by childhood
+    #         filter_a = self.df['subject_a'] == person
+    #         filter_b = self.df['relationship'] == 'filho(a)'
+    #         parents_a = self.df[filter_a & filter_b]
+    #         if parents_a.shape[0] > 0:
+    #             for i, x in parents_a.iterrows():
+    #                 parents_a.at[i, 'subject_a'] = x.subject_b
+    #                 parents_a.at[i, 'subject_b'] = x.subject_a
+    #                 parents_a.at[i, 'relationship'] = 'pai/mãe'
+    #         self.df = np.union1d(self.df, parents_a)
+
+
 
     @staticmethod
     def __decode_simple_relationship(subject, data):

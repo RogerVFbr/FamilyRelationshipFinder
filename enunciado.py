@@ -25,6 +25,27 @@ Anne,_,Thais
 DB RELATIONSHIPS = ['mãe' 'pai' 'esposa' 'filho de' 'esposo' 'mae' 'bisavô']
 ENUNCIADO RELATIONSHIPS = ['avô', 'avó',]
 
+Thais é irmão(ã) de Thomas.
+Thais -> filho(a) de Maria J -> pai/mãe de Thomas
+
+Thais é sobrinho(a) de Marilda.
+Thais -> filho(a) de Maria J -> esposo(a) de Juarez -> filho(a) de Darci -> esposo(a) de Miguel -> pai/mãe de Jonas -> esposo(a) de Marilda
+
+Raphael é primo(a) de Tiago.
+Raphael -> filho(a) de Maria de Fátima -> filho(a) de Maria B -> pai/mãe de Maria J -> pai/mãe de Tiago
+
+Miguel é esposo(a) de Darci.
+Miguel -> esposo(a) de Darci
+
+Tiago é bisneto(a) de Umbelino.
+Tiago -> filho(a) de Maria J -> esposo(a) de Juarez -> filho(a) de Darci -> esposo(a) de Miguel -> filho(a) de Umbelino
+
+Malaquias é None de Maria B.
+Malaquias -> bisavô de Thomas -> filho(a) de Maria J -> filho(a) de Maria B
+
+Anne é primo(a) de Thais.
+Anne -> esposo(a) de Tiago -> filho(a) de Maria J -> pai/mãe de Thais
+
 """
 
 

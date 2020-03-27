@@ -5,103 +5,90 @@ import numpy as np
 class Subject:
 
     def __init__(self, name, db):
+        self.db = db
         self.name = name
-        self.spouse = self.__get_spouse(db)
-        self.father = None
-        self.mother = None
-        self.__get_parents(db)
-        self.brothers = self.__get_brothers(db)
-        self.children = self.__get_children(db)
-        self.grand_fathers = self.__get_grand_fathers(db)
-        self.grand_mothers = self.__get_grand_mothers(db)
-        self.cousins = self.__get_cousins(db)
+        self.spouse = self.__get_spouse(name)
+        self.parents = self.__get_parents(name)
+        self.siblings = self.__get_siblings(name)
+        self.children = self.__get_children(name)
+        self.uncle_aunt = self.__get_uncle_aunt(name)
+        self.cousins = self.__get_cousins(name)
 
-    def __get_spouse(self, db):
-
-        filter_a = db['subject_a'] == self.name
-        filter_b = db['subject_b'] == self.name
-        filter_c = db['relationship'] == 'esposa'
-        filter_d = db['relationship'] == 'esposo'
-
-        df = db.loc[(filter_a | filter_b) & (filter_c | filter_d)]
+    def __get_spouse(self, name):
+        df = self.db
+        df = df.loc[((df.subject_a == name) | (df.subject_b == name)) & (df.relationship == 'esposo(a)')]
         if df.shape[0] > 0:
-            if df['subject_a'].iloc[0] == self.name:
+            if df['subject_a'].iloc[0] == name:
                 return df['subject_b'].iloc[0]
             else:
                 return df['subject_a'].iloc[0]
 
-        return None
+        return np.array([])
 
-    def __get_parents(self, db):
+    def __get_parents(self, name):
+        parents, df = np.array([]), self.db
+        df_a = df.loc[(df.relationship == 'pai/mãe') & (df.subject_b == name)]
+        parents = np.union1d(parents, pd.unique(df_a.subject_a.values.ravel('K')))
+        df_b = df.loc[(df.relationship == 'filho(a)') & (df.subject_a == name)]
+        parents = np.union1d(parents, pd.unique(df_b.subject_b.values.ravel('K')))
+        if len(parents) < 2:
+            df_c = df.loc[(df.relationship == 'esposo(a)') & (df.subject_a.isin(parents) | df.subject_b.isin(parents))]
+            parents = np.union1d(parents, pd.unique(df_c[['subject_a', 'subject_b']].values.ravel('K')))
 
-        df = db.loc[(db['subject_b'] == self.name) & (db['relationship'] == 'pai')]
-        if df.shape[0] > 0:
-            self.father = df['subject_a'].iloc[0]
+        return parents
 
-        df = db.loc[(db['subject_b'] == self.name) & (db['relationship'] == 'mãe')]
-        if df.shape[0] > 0:
-            self.mother = df['subject_a'].iloc[0]
+    def __get_siblings(self, name):
+        df, parents = self.db, self.__get_parents(name)
+        unique_a, unique_b = np.array([]), np.array([])
+        for parent in parents:
+            df_a = df.loc[(df.relationship == 'pai/mãe') & (df.subject_a == parent)]
+            df_b = df.loc[(df.relationship == 'filho(a)') & (df.subject_b == parent)]
+            unique_a = pd.unique(df_a.subject_b.values.ravel('K'))
+            unique_b = pd.unique(df_b.subject_a.values.ravel('K'))
+        siblings = np.union1d(unique_a, unique_b)
+        return np.setdiff1d(siblings, np.array([name]))
 
-        if not self.father:
-            df = db.loc[(db['subject_a'] == self.mother) & (db['relationship'] == 'esposa')]
-            if df.shape[0] > 0:
-                self.father = df['subject_b'].iloc[0]
-
-        if not self.mother:
-            df = db.loc[(db['subject_a'] == self.father) & (db['relationship'] == 'esposo')]
-            if df.shape[0] > 0:
-                self.mother = df['subject_b'].iloc[0]
-
-    def __get_brothers(self, db):
-
-        filter_a = db['subject_a'] == self.mother
-        filter_b = db['relationship'] == 'mãe'
-        filter_c = db['subject_b'] != self.name
-
-        filter_d = db['subject_a'] == self.father
-        filter_e = db['relationship'] == 'pai'
-
-        filter_f = db['subject_b'] == self.mother
-        filter_g = db['subject_b'] == self.father
-        filter_h = db['relationship'] == 'filho de'
-        filter_i = db['subject_a'] != self.name
-
-        df_a = db.loc[(filter_a & filter_b & filter_c) | (filter_d & filter_e & filter_c)]
-        df_b = db.loc[(filter_f | filter_g) & filter_h & filter_i]
-
-        unique_a = pd.unique(df_a[['subject_b']].values.ravel('K'))
-        unique_b = pd.unique(df_b[['subject_a']].values.ravel('K'))
-
+    def __get_children(self, name):
+        df = self.db
+        name_and_spouse = [name] + list(self.__get_spouse(name))
+        df_a = df.loc[df.subject_a.isin(name_and_spouse) & (df.relationship == 'pai/mãe')]
+        df_b = df.loc[df.subject_b.isin(name_and_spouse) & (df.relationship == 'filho(a)')]
+        unique_a = pd.unique(df_a['subject_b'].values.ravel('K'))
+        unique_b = pd.unique(df_b['subject_a'].values.ravel('K'))
         return np.union1d(unique_a, unique_b)
 
-    def __get_children(self, db):
+    def __get_uncle_aunt(self, name):
+        parents = self.__get_parents(name)
+        uncle_aunts, uncle_aunts_spouses = np.array([]), np.array([])
+        for parent in parents:
+            uncle_aunts = np.union1d(uncle_aunts, self.__get_siblings(parent))
+        if uncle_aunts.size == 0:
+            return uncle_aunts
+        uncle_aunts = np.setdiff1d(uncle_aunts, parents)
+        if uncle_aunts.size == 0:
+            return uncle_aunts
+        for uncle_aunt in uncle_aunts:
+            uncle_aunts_spouses = np.union1d(uncle_aunts_spouses, self.__get_spouse(uncle_aunt))
+        return np.union1d(uncle_aunts, uncle_aunts_spouses)
 
-        filter_a = db['subject_a'] == self.name
-        filter_b = db['relationship'] == 'pai'
-        filter_c = db['relationship'] == 'mãe'
+    def __get_cousins(self, name):
+        parents = self.__get_parents(name)
+        uncle_aunts, cousins = np.array([]), np.array([])
+        for parent in parents:
+            uncle_aunts = np.union1d(self.__get_siblings(parent), uncle_aunts)
+        if uncle_aunts.size == 0:
+            return uncle_aunts
+        uncle_aunts = np.setdiff1d(uncle_aunts, parents)
+        if uncle_aunts.size == 0:
+            return uncle_aunts
+        for uncle_aunt in uncle_aunts:
+            cousins = np.union1d(cousins, self.__get_children(uncle_aunt))
 
-        filter_d = db['subject_b'] == self.name
-        filter_e = db['relationship'] == 'filho de'
-
-        df_a = db.loc[filter_a & (filter_b | filter_c)]
-        df_b = db.loc[filter_d & filter_e]
-
-        unique_a = pd.unique(df_a[['subject_b']].values.ravel('K'))
-        unique_b = pd.unique(df_b[['subject_a']].values.ravel('K'))
-
-        return np.union1d(unique_a, unique_b)
-
-    def __get_grand_fathers(self, db):
-        return []
-
-    def __get_grand_mothers(self, db):
-        return []
-
-    def __get_cousins(self, db):
-        return []
+        return cousins
 
     def __repr__(self):
-        # return f'Subject(name={self.name}, spouse={self.spouse}, father={self.father}, mother={self.mother})'
-        return f'Subject(name={self.name}, spouse={self.spouse}, father={self.father}, mother={self.mother}, ' \
-               f'brothers={self.brothers}, children={self.children})'
+        return f'Subject(name={self.name}, spouse={self.spouse}, parents={self.parents}, ' \
+               f'siblings={self.siblings}, children={self.children}, uncle_aunts={self.uncle_aunt}, ' \
+               f'cousins={self.cousins})'
+
 
