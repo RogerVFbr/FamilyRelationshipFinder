@@ -12,7 +12,7 @@ class Subject:
         self.parents = self.__get_relatives_by_generation(name, 1)
         self.siblings = self.__get_siblings(name)
         self.cousins = self.__get_cousins(name)
-        self.children = self.__get_children(name)
+        self.children = self.__get_relatives_by_generation(name, -1)
         self.uncle_aunt = self.__get_uncle_aunt(name)
         self.grands = self.__get_relatives_by_generation(name, 2)
         self.great_grands = self.__get_relatives_by_generation(name, 3)
@@ -65,7 +65,6 @@ class Subject:
         else:
             return None
 
-
     def __get_brother_sister_in_law(self, name):
         spouse = self.__get_spouse(name)
         if not spouse:
@@ -73,7 +72,6 @@ class Subject:
         return self.__get_siblings(spouse)
 
     def __get_relatives_by_generation(self, name, target_gen, relatives=np.array([]), depth=0):
-
         if target_gen >= 0:
             acquired_relatives = self.__get_parents(name)
             depth += 1
@@ -166,26 +164,24 @@ class Subject:
     def __find_relevant_relationships(self, subject_a, subject_b, data=pd.DataFrame()):
 
         # Direct connection found, append and return.
-        filter_a = self.db.subject_a.isin([subject_a, subject_b])
-        filter_b = self.db.subject_b.isin([subject_a, subject_b])
-        direct_relationship = self.db.loc[filter_a & filter_b]
+        df, subjects = self.db, [subject_a, subject_b]
+        direct_relationship = df.loc[df.subject_a.isin(subjects) & df.subject_b.isin(subjects)]
         if direct_relationship.shape[0] > 0:
             data = data.append(direct_relationship, ignore_index=True)
             return data
 
         # Get related subjects
-        related = self.db.loc[(self.db.subject_a == subject_a) | (self.db.subject_b == subject_a)]
+        related = df.loc[(df.subject_a == subject_a) | (df.subject_b == subject_a)]
         names = pd.unique(related[['subject_a', 'subject_b']].values.ravel('K'))
         names = names[names != subject_a]
-        for x in names:
-            if x in self.checked_names:
-                continue
+
+        names_iterator = (x for x in names if x not in self.checked_names)
+        for x in names_iterator:
             self.checked_names.append(x)
             data = self.__find_relevant_relationships(x, subject_b, data)
             if data.shape[0] > 0:
-                filter_a = self.db.subject_a.isin([x, subject_a])
-                filter_b = self.db.subject_b.isin([x, subject_a])
-                current_rel = self.db.loc[filter_a & filter_b]
+                subjects = [x, subject_a]
+                current_rel = df.loc[df.subject_a.isin(subjects) & df.subject_b.isin(subjects)]
                 if current_rel.shape[0] > 0:
                     data = data.append(current_rel, ignore_index=True)
                     return data
@@ -222,5 +218,3 @@ class Subject:
                f'    great_grands={list(self.great_grands)}\n' \
                f'    brother_sister_in_law={list(self.brother_sister_in_law)}\n' \
                f')'
-
-
