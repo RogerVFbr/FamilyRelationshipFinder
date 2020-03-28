@@ -7,12 +7,89 @@ class Subject:
     def __init__(self, name, db):
         self.db = db
         self.name = name
+        self.checked_names = []
         self.spouse = self.__get_spouse(name)
-        self.parents = self.__get_parents(name)
+        self.parents = self.__get_relatives_by_generation(name, 1)
         self.siblings = self.__get_siblings(name)
+        self.cousins = self.__get_cousins(name)
         self.children = self.__get_children(name)
         self.uncle_aunt = self.__get_uncle_aunt(name)
-        self.cousins = self.__get_cousins(name)
+        self.grands = self.__get_relatives_by_generation(name, 2)
+        self.great_grands = self.__get_relatives_by_generation(name, 3)
+        self.brother_sister_in_law = self.__get_brother_sister_in_law(name)
+
+    def get_relationship(self, subject):
+
+        if subject == self.name:
+            return 'o próprio'
+        elif self.spouse and subject == self.spouse:
+            return 'esposo(a)'
+        elif self.parents.size > 0 and subject in self.parents:
+            return 'filho(a)'
+        elif self.siblings.size > 0 and subject in self.siblings:
+            return 'irmão(ã)'
+        elif self.cousins.size > 0 and subject in self.cousins:
+            return 'primo(a)'
+        elif self.children.size > 0 and subject in self.children:
+            return 'pai/mãe'
+        elif self.uncle_aunt.size > 0 and subject in self.uncle_aunt:
+            return 'sobrinho(a)'
+        elif self.great_grands.size > 0 and subject in self.great_grands:
+            return 'bisneto(a)'
+        elif self.brother_sister_in_law.size > 0 and subject in self.brother_sister_in_law:
+            return 'cunhado(a)'
+        else:
+            return None
+
+    def get_relative(self, relationship):
+
+        if self.spouse and relationship == 'esposo(a)':
+            return str(self.spouse)
+        elif self.parents.size > 0 and relationship in ['pai/mãe']:
+            return ', '.join(list(self.parents)) if self.parents.size > 1 else str(self.parents[0])
+        elif self.siblings.size > 0 and relationship in ['irmão(â)']:
+            return ', '.join(list(self.siblings)) if self.siblings.size > 1 else str(self.siblings[0])
+        elif self.cousins.size > 0 and relationship in ['primo(a)']:
+            return ', '.join(list(self.cousins)) if self.cousins.size > 1 else str(self.cousins[0])
+        elif self.children.size > 0 and relationship in ['filho(a)']:
+            return ', '.join(list(self.children)) if self.children.size > 1 else str(self.children[0])
+        elif self.uncle_aunt.size > 0 and relationship in ['tio(a)']:
+            return ', '.join(list(self.uncle_aunt)) if self.uncle_aunt.size > 1 else str(self.uncle_aunt[0])
+        elif self.grands.size > 0 and relationship in ['avô/ó', 'avó', 'avô']:
+            return ', '.join(list(self.grands)) if self.grands.size > 1 else str(self.grands[0])
+        elif self.great_grands.size > 0 and relationship in ['bisavô/ó']:
+            return ', '.join(list(self.great_grands)) if self.great_grands.size > 1 else str(self.great_grands[0])
+        elif self.brother_sister_in_law.size > 0 and relationship in ['cunhado(a)']:
+            return ', '.join(list(self.brother_sister_in_law)) if self.brother_sister_in_law.size > 1 \
+                else str(self.brother_sister_in_law[0])
+        else:
+            return None
+
+
+    def __get_brother_sister_in_law(self, name):
+        spouse = self.__get_spouse(name)
+        if not spouse:
+            return np.array([])
+        return self.__get_siblings(spouse)
+
+    def __get_relatives_by_generation(self, name, target_gen, relatives=np.array([]), depth=0):
+
+        if target_gen >= 0:
+            acquired_relatives = self.__get_parents(name)
+            depth += 1
+        else:
+            acquired_relatives = self.__get_children(name)
+            depth -= 1
+
+        if depth == target_gen:
+            relatives = np.union1d(relatives, acquired_relatives)
+            return relatives
+
+        for x in acquired_relatives:
+            new_relatives = self.__get_relatives_by_generation(x, target_gen, relatives, depth)
+            relatives = np.union1d(relatives, new_relatives)
+
+        return relatives
 
     def __get_spouse(self, name):
         df = self.db
@@ -86,9 +163,64 @@ class Subject:
 
         return cousins
 
+    def __find_relevant_relationships(self, subject_a, subject_b, data=pd.DataFrame()):
+
+        # Direct connection found, append and return.
+        filter_a = self.db.subject_a.isin([subject_a, subject_b])
+        filter_b = self.db.subject_b.isin([subject_a, subject_b])
+        direct_relationship = self.db.loc[filter_a & filter_b]
+        if direct_relationship.shape[0] > 0:
+            data = data.append(direct_relationship, ignore_index=True)
+            return data
+
+        # Get related subjects
+        related = self.db.loc[(self.db.subject_a == subject_a) | (self.db.subject_b == subject_a)]
+        names = pd.unique(related[['subject_a', 'subject_b']].values.ravel('K'))
+        names = names[names != subject_a]
+        for x in names:
+            if x in self.checked_names:
+                continue
+            self.checked_names.append(x)
+            data = self.__find_relevant_relationships(x, subject_b, data)
+            if data.shape[0] > 0:
+                filter_a = self.db.subject_a.isin([x, subject_a])
+                filter_b = self.db.subject_b.isin([x, subject_a])
+                current_rel = self.db.loc[filter_a & filter_b]
+                if current_rel.shape[0] > 0:
+                    data = data.append(current_rel, ignore_index=True)
+                    return data
+        return data
+
+    def get_relationship_chain(self, subject):
+        last_subject = relationship_line = self.name
+        data = self.__find_relevant_relationships(self.name, subject)[::-1].reset_index(drop=True)
+        for i, x in data.iterrows():
+            if x.subject_a != last_subject:
+                a, b = x.subject_a, x.subject_b
+                data.at[i, 'subject_a'] = b
+                data.at[i, 'subject_b'] = a
+                if x.relationship == 'pai/mãe':
+                    data.at[i, 'relationship'] = 'filho(a)'
+                elif x.relationship == 'filho(a)':
+                    data.at[i, 'relationship'] = 'pai/mãe'
+
+            relationship_line += f" -> {x.relationship} de {x.subject_b}"
+            last_subject = x.subject_b
+
+        return relationship_line
+
     def __repr__(self):
-        return f'Subject(name={self.name}, spouse={self.spouse}, parents={self.parents}, ' \
-               f'siblings={self.siblings}, children={self.children}, uncle_aunts={self.uncle_aunt}, ' \
-               f'cousins={self.cousins})'
+        return f'Subject(\n' \
+               f'    name={self.name},\n' \
+               f'    spouse={self.spouse},\n' \
+               f'    parents={list(self.parents)},\n' \
+               f'    siblings={list(self.siblings)},\n' \
+               f'    children={list(self.children)},\n' \
+               f'    uncle_aunts={list(self.uncle_aunt)},\n' \
+               f'    cousins={list(self.cousins)}\n' \
+               f'    grands={list(self.grands)}\n' \
+               f'    great_grands={list(self.great_grands)}\n' \
+               f'    brother_sister_in_law={list(self.brother_sister_in_law)}\n' \
+               f')'
 
 
