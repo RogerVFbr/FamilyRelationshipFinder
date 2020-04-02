@@ -35,8 +35,9 @@ if __name__ == "__main__":
     f = FamilyFinder("familia.csv")
 
     get_relationship_use_cases = [
-        ('Thais', 'Thomas'), ('Thais', 'Marilda'), ('Raphael', 'Tiago'), ('Miguel', 'Darci'),
-        ('Tiago', 'Umbelino'), ('Malaquias', 'Maria B'), ('Anne', 'Thais')
+        # ('Thais', 'Thomas'), ('Thais', 'Marilda'), ('Raphael', 'Tiago'), ('Miguel', 'Darci'),
+        ('Fabiola', 'João'),
+        # ('Tiago', 'Umbelino'), ('Malaquias', 'Maria B'), ('Anne', 'Thais')
     ]
 
     for a, b in get_relationship_use_cases:
@@ -45,6 +46,6 @@ if __name__ == "__main__":
 
     get_relative_use_cases = [('Thais', 'avô'), ('Fabiola', 'avô'), ('Natalia', 'avó')]
 
-    for a, b in get_relative_use_cases:
-        relative = f.get_relative(a, b)
-        print(f'{relative} é(são) {b}(s) de {a}.')
+    # for a, b in get_relative_use_cases:
+    #     relative = f.get_relative(a, b)
+    #     print(f'{relative} é(são) {b}(s) de {a}.')

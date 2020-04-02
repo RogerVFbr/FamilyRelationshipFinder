@@ -34,6 +34,8 @@ class Subject:
             return 'pai/mãe'
         elif self.uncle_aunt.size > 0 and subject in self.uncle_aunt:
             return 'sobrinho(a)'
+        elif self.great_grands.size > 0 and subject in self.grands:
+            return 'neto(a)'
         elif self.great_grands.size > 0 and subject in self.great_grands:
             return 'bisneto(a)'
         elif self.brother_sister_in_law.size > 0 and subject in self.brother_sister_in_law:
